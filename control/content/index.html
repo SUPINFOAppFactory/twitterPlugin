@@ -1,0 +1,120 @@
+﻿<!DOCTYPE html>
+<html ng-app="twitterPlugin">
+<head lang="en">
+    <meta charset="UTF-8">
+    <title>content</title>
+    <!-- CSS -->
+    <link href="../../../../styles/helper.css" rel="stylesheet">
+
+    <!-- JS -->
+    <script src="../../../../scripts/buildfire.js"></script>
+    <script src="../../../../scripts/angular/angular.min.js"></script>
+</head>
+<body ng-controller="twitterPluginCtrl" id="webviewApp" ng-cloak ng-show="datastoreInitialized">
+<div ng-form="frmMain">
+    <div class="item clearfix row margin-bottom-fifteen">
+        <div class="labels col-md-2 padding-right-zero pull-left">
+            <span>Twitter handler</span>
+        </div>
+        <div class="col-md-8 pull-left">
+            <input id="url" name="twitterHandler" placeholder="https://www.twitter.com" type="text" class="form-control"
+                   ng-model="data.content.twitterHandler" required pattern="(https?\:\/\/)?(?:www\.)?twitter\.com\/.+">
+        </div>
+        <div class="col-md-2 pull-left padding-zero">
+            <button class="btn btn-success" ng-click="validateUrl()">
+                Validate
+            </button>
+        </div>
+    </div>
+
+    <div class="item clearfix row" ng-show="handlerEmpty">
+        <div class="labels col-md-2 padding-right-zero pull-left"></div>
+        <div class="col-md-10 pull-left">
+            <div class="alert alert-danger transition-half">Please enter a valid Twitter URL</div>
+        </div>
+    </div>
+</div>
+
+<script>
+    var twitterPluginApp = angular.module('twitterPlugin', []);
+
+    twitterPluginApp.controller("twitterPluginCtrl", ["$scope", "$log", "$timeout", function ($scope, $log, $timeout) {
+        var timer = null,
+                dataChanged = false;
+
+        $scope.datastoreInitialized = false;
+        $scope.handlerEmpty = false;
+        /*
+         * Go pull any previously saved data
+         * */
+        buildfire.datastore.get(function (err, result) {
+            if (!err) {
+                $scope.datastoreInitialized = true;
+                if (result && !result.id) {
+                    $scope.data = {
+                        content: {
+                            twitterHandler: "https://twitter.com/katyperry"
+                        }
+                    };
+                }
+            } else {
+                console.error("Error: ", err);
+                return;
+            }
+
+            if (result && result.data && !angular.equals({}, result.data)) {
+                $scope.data = result.data;
+                $scope.id = result.id;
+            }
+
+            /*
+             * watch for changes in data
+             * */
+            $scope.$watch('data', function (newObj, oldObj) {
+                if (angular.equals(newObj, oldObj) || newObj == undefined) {
+                    dataChanged = false;
+                } else {
+                    dataChanged = true;
+                }
+            }, true);
+
+            if (!$scope.$$phase && !$scope.$root.$$phase) {
+                $scope.$apply();
+            }
+        });
+
+        $scope.validateUrl = function () {
+            if (!$scope.datastoreInitialized) {
+                console.error("Error with datastore didn't get called");
+                return;
+            }
+            if (!dataChanged) {
+                console.warn("data didn't changed");
+                return;
+            }
+            var data = $scope.data;
+            // if the form has some invalid data do not save, in our case the user eneter invalid URL
+            if ($scope.frmMain.$invalid) {
+                $log.warn('invalid data, details will not be saved');
+                $scope.handlerEmpty = true;
+            } else {
+                $scope.handlerEmpty = false;
+                dataChanged = false;
+                if (!/^https?\:\/\//.test(data.content.twitterHandler)) {
+                    data.content.twitterHandler = "https://" + data.content.twitterHandler;
+                }
+
+                buildfire.datastore.save(data, function (err, result) {
+                    if (err || !result) {
+                        $log.error('Error saving the widget details: ', err);
+                    }
+                    else {
+                        $log.info('Widget details saved');
+                    }
+                });
+            }
+        };
+    }]);
+</script>
+</body>
+</html>
